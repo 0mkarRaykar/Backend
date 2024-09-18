@@ -56,6 +56,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to upload files to Cloudinary");
   }
 
+  // taking res from cloudinary
   const { duration } = videoFile;
 
   const video = await Video.create({
