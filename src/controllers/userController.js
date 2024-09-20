@@ -271,7 +271,17 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Avatar file is missing");
   }
 
-  //TODO: delete old image - assignment
+  // Get the current user
+  const currentUser = await User.findById(req.user?._id);
+  if (!currentUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Delete the old avatar image from Cloudinary
+  if (currentUser.avatar) {
+    const publicId = currentUser.avatar.split("/").pop().split(".")[0]; // Extract public ID from URL
+    await cloudinary.v2.uploader.destroy(publicId); // Use Cloudinary's destroy method
+  }
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
