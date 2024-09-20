@@ -6,19 +6,86 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCloudinary } from "../utils/fileUpload.js";
 
-const getAllVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
-  //TODO: get all videos based on query, sort, pagination
+const getAllVideos = asyncHandler(async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      query = "",
+      sortBy = ["relevance", "uploadDate", "viewCount"],
+      sortType = ["video", "playlist", "channel"],
+      userId,
+    } = req.query;
 
-  const videos = await Video.find({});
+    const pageNumber = Math.max(1, Number(page));
+    const limitNumber = Math.max(1, Number(limit));
 
-  if (!videos || videos.length === 0) {
-    throw new ApiError(404, "No video to display");
+    const filter = {};
+
+    if (query) {
+      filter.title = { $regex: query, $options: "i" };
+    }
+    if (userId && isValidObjectId(userId)) {
+      filter.userId = userId;
+    }
+
+    const sortOptions = {};
+
+    switch (sortBy) {
+      case "relevance":
+        sortOptions.title = 1;
+        break;
+      case "uploadDate":
+        sortOptions.createdAt = -1;
+      case "viewCount":
+        sortOptions.viewCount = -1;
+      default:
+        sortOptions.title = 1;
+    }
+
+    switch (sortType) {
+      case "video":
+        filter.type = "video";
+        break;
+      case "playlist":
+        filter.type = "playlist";
+      case "channel":
+        filter.type = "channel";
+      default:
+        break;
+    }
+
+    const totalVideos = await Video.countDocuments(filter);
+
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const videos = await Video.find(filter)
+      .skip(skip)
+      .limit(limitNumber)
+      .sort(sortOptions);
+
+    if (!videos || videos.length === 0) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, [], "No videos to display"));
+    }
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          videos,
+          totalVideos,
+          pageNumber,
+          limitNumber,
+          "Videos fetched successfully"
+        )
+      );
+  } catch (error) {
+    // Handle any unexpected errors
+    throw new ApiError(500, "Something went wrong, please try again later.");
   }
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -81,21 +148,115 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: get video by id
+
+  // Validate the videoId
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  // Find the video by ID
+  const video = await Video.findById(videoId);
+
+  // Check if the video was found
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // Return the video details
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video fetched successfully"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: update video details like title, description, thumbnail
+  const { title, description } = req.body;
+
+  // Validate the videoId
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  // Prepare the update object
+  const updateData = {};
+  if (title) updateData.title = title;
+  if (description) updateData.description = description;
+
+  // Check if a thumbnail is being uploaded
+  if (req.file) {
+    const thumbnailLocalPath = req.file.path;
+    const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+    if (!thumbnail) {
+      throw new ApiError(500, "Failed to upload thumbnail");
+    }
+    updateData.thumbnail = thumbnail.url;
+  }
+
+  // Update the video
+  const updatedVideo = await Video.findByIdAndUpdate(videoId, updateData, {
+    new: true,
+  });
+
+  // Check if the video was found and updated
+  if (!updatedVideo) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // Return the updated video details
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedVideo, "Video updated successfully"));
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: delete video
+
+  // Validate the videoId
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  // Delete the video
+  const deletedVideo = await Video.findByIdAndDelete(videoId);
+
+  // Check if the video was deleted
+  if (!deletedVideo) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // Return a success message
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Video deleted successfully"));
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+
+  // Validate the videoId
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  // Find the video by ID
+  const video = await Video.findById(videoId);
+
+  // Check if the video was found
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // Toggle the publish status
+  video.isPublished = !video.isPublished;
+
+  // Save the updated video
+  await video.save();
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, video, "Video publish status toggled successfully")
+    );
 });
 
 export {
