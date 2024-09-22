@@ -10,7 +10,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
 
   const video = await Video.findById(videoId);
-  ("nice video");
+  
   if (!video) {
     throw new ApiError(404, "Video not found");
   }
