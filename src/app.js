@@ -25,7 +25,6 @@ import videoRouter from "./routes/videoRoutes.js";
 import commentRouter from "./routes/commentRoutes.js";
 import likeRouter from "./routes/likeRoutes.js";
 import playlistRouter from "./routes/playlistRoutes.js";
-import dashboardRouter from "./routes/dashboardRoutes.js";
 
 // routes declaration
 app.use("/users", userRouter);
@@ -36,6 +35,5 @@ app.use("/videos", videoRouter);
 app.use("/comments", commentRouter);
 app.use("/likes", likeRouter);
 app.use("/playlist", playlistRouter);
-app.use("/dashboard", dashboardRouter);
 
 export { app };
